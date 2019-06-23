@@ -1,50 +1,71 @@
-library(robustbase)
 library(alabama)
 library(fda)
+library(robustbase)
 source('src/generar.R')
 source('src/minimizar.R')
 source('src/mpl.v7.R')  ## source('src/mpl-pablo.R')
 
 
-## Wrapper for simLudu and simAlvyoh
 simular <- function (datos, nn, estimate, cont, extra = NULL, poda,
                      from, to, carpeta) {
-
+    
+    ## ---------------------------------------
+    ## Wrapper for simular_Ludu and simular_AY
+    ## ---------------------------------------
+    
     if (estimate$type == "nos") {
-        simAlvYoh(datos, nn, cont, extra, estimate$ven, poda, from, to,
-                  carpeta)
+        lapply(estimate$ven,
+               function (ven) {
+                   simular_AY(datos = datos,
+                              nn = nn,
+                              cont = cont,
+                              ven = ven,
+                              extra = extra,
+                              poda = poda,
+                              from = from,
+                              to = to,
+                              carpeta = carpeta)
+               })
     }
-
+    
     if (estimate$type == "splines") {
         lapply(estimate$spl,
                function (spl) {
-                   simLuDu(datos, nn, spl, cont, extra,
-                           estimate$initial, estimate$fLoss, poda, from,
-                           to, carpeta)
+                   simular_LuDu(datos = datos,
+                                nn = nn,
+                                spl = spl,
+                                cont = cont,
+                                extra = extra,
+                                initial = estimate$initial,
+                                fLoss = estimate$fLoss,
+                                poda = poda,
+                                from = from,
+                                to = to,
+                                carpeta = carpeta)
                })
     }
 }
 
 
-simLuDu <- function (datos, nn, spl, cont, extra = NULL, initial, fLoss,
-                     poda, from, to, carpeta) {
+simular_LuDu <- function (datos, nn, spl, cont, extra = NULL, initial,
+                          fLoss, poda, from, to, carpeta) {
 
-    ## ---------------------------------------------------------------------
+    ## -----------------------------------------------------------------
     ## Regresion parcialmente lineal con restricciones de monotonia
     ##
     ## Siguiendo los trabajos de Lu y Du (200?)
-    ## ---------------------------------------------------------------------
-    ## datos  : 'sosa', 'du', 'ay'
+    ## -----------------------------------------------------------------
+    ## datos  : 'sosa', 'du', 'ay', 'revision'
     ## nn     : sample size
     ## spl    : number of splines
-    ## cont    : contamination scheme 'C0', 'C1', 'C2', 'C3', 'C4'
+    ## cont   : contamination scheme 'C0', 'C1', ...
     ## initial: 'cl', 'rb', 'ay'
     ## fLoss  : loss function 'ls', 'huber', 'tukey', 'l1'
-    ## poda   : fraccion de poda en cada borde del intervalo para el MISE
-    ## from   : starting iteration
-    ## to     : last iteration
-    ## carpeta: directorio para guardar las salidas 
-    ## ---------------------------------------------------------------------
+    ## poda   : trimming for MISE
+    ## from   : starting iteration (seed)
+    ## to     : last iteration (seed)
+    ## carpeta: output folder
+    ## -----------------------------------------------------------------
     
     ## Some samples may be discarded
     done <- 0
@@ -125,15 +146,14 @@ simLuDu <- function (datos, nn, spl, cont, extra = NULL, initial, fLoss,
             write(to_write, paste(folder_name, file_name, sep = '/'),
                   append = TRUE, ncol = length(to_write))
         }
-     
+        
         ## Next iteration...
         iter <- iter + 1
     }
 }
 
-
-simAlvYoh <- function (datos, nn, cont, extra = NULL, ven, poda, from,
-                       to, carpeta) {
+simular_AY <- function (datos, nn, cont, extra = NULL, ven, poda, from,
+                        to, carpeta) {
     ## ------------------------------------------------------------------
     ## Regresion parcialmente lineal con restricciones de monotonia
     ##
@@ -188,7 +208,7 @@ simAlvYoh <- function (datos, nn, cont, extra = NULL, ven, poda, from,
             write(to_write, paste(folder_name, '/', file_name, '.txt', sep = ''),
                   append = TRUE, ncol = length(to_write))
         }
-       
+        
         ## Next iteration...
         iter <- iter + 1
     }

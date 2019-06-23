@@ -21,17 +21,19 @@ generar <- function (datos, nn, out, extra) {
 
 generar_revision <- function (nn, out) {
     ## -----------------------------------
-    ## nn    : sample size
-    ## out   : contamination rate
+    ## nn  : sample size
+    ## out : contamination scheme (string)
     ## -----------------------------------
+    
     tt <- runif(nn, 0, 1)
     bb <- c(0.5, 1)
     xx <- matrix(rt(2 * nn,2), nn, 2)
     gg <- sin(pi * tt / 2)
     ee <- rt(nn,2)*0.5
-    ## Contamination
-    ## Response
+  
     yy <- xx %*% bb + gg + ee
+
+    ## Contamination schemes
     if (out == 'C13') {
         oo <- (0 < tt & tt < 0.1)
         yy[oo == 1] <- 3
@@ -55,10 +57,8 @@ generar_revision <- function (nn, out) {
         ee[oo == 1] <- runif(sum(oo), 2, 4)
         yy[oo == 1] <- xx[oo == 1,] %*% bb + gg[oo == 1] + ee[oo == 1]
     }
-        return(list(y = yy, x = xx, t = tt,
-                b = bb,
-                g = gg,
-                e = ee))
+    
+    return(list(y = yy, x = xx, t = tt, b = bb, g = gg, e = ee))
 }
 
 
