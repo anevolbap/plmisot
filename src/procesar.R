@@ -40,7 +40,7 @@ mejor <- function (folder, cuales, criterio) {
 }
 
 
-resumir <- function (archivo, ff, bb, rango, plt = FALSE) {
+resumir <- function (archivo, ff, bb, rango, plt = FALSE,...) {
     ## ---------------------------------------------------------
     ## Wrapper for resumir_LuDu and resumir_AY
     ## ---------------------------------------------------------
