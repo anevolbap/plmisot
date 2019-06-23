@@ -1,0 +1,96 @@
+#' 
+#' M-step with (optional) scale update 
+#'
+#' Does 'k' IRWLS refining steps from 'init.beta'. If 'init.scale' is
+#' present, it's used, o/w the MAD is used.
+#'
+#' @param X the data matrix X.
+#' @param y the response vector.
+#' @param ncons number of non-negativity constrains (las primeras)
+#' @param init.beta initial beta.
+#' @param init.scale initial scale.
+#' @param max.it number of refining steps
+#' @param b tuning constants of the equation
+#' @param cc tuning constants of the equation
+#' @param step 'S' for a S-estimator, 'M' for a M-step.
+#'
+#' @return \item{beta.rw}{A vector of the reweighted estimate.}
+#'         \item{scale.rw}{Scale associated with the obtained estimate.}
+#'         \item{conv.rw}{Convergence flag.}
+#' @export
+#'
+#' @importFrom quadprog solve.QP
+#'
+refinar <- function(X, y, ncons, init.beta, init.scale,
+                    max.it, b, cc, step) {
+    
+    ## Initial beta and its residual
+    beta <- init.beta
+    res  <- y - X %*% beta
+    
+    ## Initial scale
+    if (missing(init.scale)) {
+        init.scale <- scale <- median(abs(res))/0.6745
+    } else {
+        scale <- init.scale
+    }
+
+    norm <- function(x) sqrt(sum(x^2))
+    
+    ## Tukey's bisquare function (== Mchi(x, cc=1.56, psi = 'bisquare'))
+    rho <- function(u, cc = 1.56) { 
+        aux <- abs(u) <= cc
+        uu  <- u/cc
+        ret <- uu^2 * (3 - 3 * uu^2 + uu^4) * aux + (1 - aux)
+        return(ret)
+    }
+
+    ## Weight function (== Mwgt(x, cc=1.56, psi = 'bisquare'))
+    f.w <- function(u, cc) {
+        tmp <- (1 - (u/cc)^2)^2
+        tmp[abs(u/cc) > 1] <- 0
+        return(tmp)
+    }
+    
+    for (i in 1:max.it) {
+        ## Do one step of the iterations to solve for the scale
+        if (step == 'S'){
+            scale <- sqrt(scale^2 * mean(rho(res/scale, cc))/b)
+        }
+        
+        ## Weights
+        ww <- sqrt(drop(f.w(res/scale, cc = cc)))
+        Xw <- X * ww
+        yw <- y * ww
+        
+        ## QP problem
+        Dmat   <- crossprod(Xw, Xw)
+        dvec   <- crossprod(Xw, yw)
+        Amat   <- t(cbind(matrix(0, ncons, ncol(X) - (ncons+1)),## emprolijar
+                          cbind(-diag(ncons),0) + cbind(0, diag(ncons))))
+        fit    <- solve.QP(Dmat = Dmat, dvec = dvec, Amat = Amat)
+        beta.1 <- fit$solution
+
+        ## Successful?
+        if (any(is.na(beta.1))) {
+            beta.1 <- init.beta
+            scale  <- init.scale
+            conv   <- 0
+            break
+        }
+        
+        ## Check for convergence
+        conv <- (norm(beta - beta.1)/norm(beta) < 1e-10)
+        if (conv) break
+
+        ## Update the estimate and its residual
+        res  <- y - X %*% beta.1
+        beta <- beta.1
+    }
+    
+    ## Objetive function at reached minimum
+    val <- sum(rho(res/scale, cc))
+
+    return(list(beta.rw = beta.1, scale.rw = scale,
+                val.rw = val, conv.rw = conv))
+}

@@ -1,0 +1,86 @@
+## -----------------------------------------------------------------------------
+## Regresion para un modelo parcialmente lineal con restriccion de monotonia 
+## Y = X * beta + g(t) + epsilon
+## -----------------------------------------------------------------------------
+
+library(robustbase) # lmrob
+library(Hmisc)      # wtd.quantile
+library(rrcov)      # pesos
+library(isotone)    # activeSet
+
+mpl <- function (xx, yy, tt, ven) {
+    ## [STEP 0] Ordenamos las observaciones
+    tto <- order(tt)
+    tt  <- tt[tto]
+    yy  <- yy[tto]
+    xx  <- xx[tto, ]
+
+    ## [STEP 1] Calculo Phi_0 y Phi_j (estimacion no paremetrica)
+    phi0_hat <- eta_hat(yy, tt, ven)
+    phi_hat  <- apply(xx, 2, eta_hat, tt, ven)
+    wt <- outer(tt, tt, function (x, y) nucleo((x - y) / ven)) # revisar los pesos
+    wt <- wt / colSums(wt)[col(wt)]
+    
+    ## [STEP 2] Calculo beta_hat (regresion robusta)
+    yyy      <- yy - phi0_hat
+    xxx      <- xx - phi_hat
+    www      <- pesos_DS(xxx)
+    control  <- lmrob.control(tunning.chi = 3.4434) # revisar constante (85% eff)
+    beta_hat <- lmrob(yyy ~ xxx - 1, weights = www, control = control)$coeff
+        
+    ## [STEP 3] Calculo g_hat (Alvarez-Yohai)
+    g_hat <- mu_hat(yy - xx %*% beta_hat)
+    
+    return(list(g = g_hat, b = beta_hat))
+}
+
+## Estimacion no parametrica
+eta_hat <- function(zz, tt, ven) {
+    ## Weights (nucleo de epanechnikov)
+    wt <- outer(tt, tt, function (x, y) nucleo((x - y) / ven)) ## FIXME: revisar los pesos
+    wt <- wt / colSums(wt)[col(wt)]
+    
+    ## Scale estimates (local-MAD)
+    ll      <- length(zz)
+    medians <- apply(wt, 1, function (x) locmedian(zz, x))
+    locmads <- sapply(1:ll, function (x) locmedian(abs(zz - medians[x]), wt[x,]))
+  
+    ## Minimization (FIXME: ver codigo de graciela)
+    funObj <- function(x, w, z, s) {
+        sum(w * Mchi((z - x) / s, cc = 1.345, psi = 'Huber', deriv = 0))
+    }
+    eta <- sapply(1:ll, function(iter) optimize(funObj, c(-1e3, 1e3),
+                                                w = wt[iter, ], z = zz,
+                                                s = locmads[iter])$minimum)
+    return(eta)
+}
+
+## Alvarez-Yohai
+mu_hat <- function (zz, cc = 1.345) { 
+    ## scl_ini <- lmrob(zz ~ 1)$scale
+    scl_ini <- mad(zz)
+    n       <- nrow(zz) 
+    orden   <- cbind(1:(n - 1), 2:n) # isotonicity (total order)
+    scl     <- scl_ini * cc
+    ret     <- activeSet(orden, hSolver, maxiter = 1e4,
+                         weights = 1, y = zz/scl, eps = scl^2/2)$x
+    ret <- ret * scl
+    return(ret)
+}
+
+## -----------------------------------------------------------------------------
+## Funciones auxiliares
+## -----------------------------------------------------------------------------
+
+## Epanechnikov kernel
+nucleo <- function (x) 0.75 * (1 - x^2) * (abs(x) <= 1)
+
+## Local median
+locmedian <- function (z, w)  wtd.quantile(z, w, c(0.5), c('i/n'), TRUE) 
+
+## Donoho-Stahel
+pesos_DS <- function (x, percentil = 0.975) {
+    DSestim  <- CovSde(x)
+    norma2.x <- mahalanobis(x, DSestim@center, DSestim@cov)
+    w1       <- Mwgt(norma2.x, qchisq(percentil, ncol(x)), psi = 'bisquare')
+}

@@ -1,0 +1,146 @@
+#' -----------------------------------------------------------------------------
+#' Regresion para un modelo parcialmente lineal con restriccion de monotonia 
+#' Y = X * beta + g(t) + epsilon
+#' -----------------------------------------------------------------------------
+
+library(robustbase) # lmrob
+library(Hmisc)      # wtd.quantile
+library(rrcov)      # pesos
+
+mpl <- function (xx, yy, tt, ven) {
+    ## Ordenamos las observaciones
+    tto <- order(tt)
+    tt  <- tt[tto]
+    yy  <- yy[tto]
+    xx  <- xx[tto, ]
+
+    ## Calculo Phi_0 y Phi_j
+    phi0_hat <- eta_hat(yy, tt, ven)
+    phi_hat  <- apply(xx, 2, eta_hat, tt, ven)
+
+    ## Calculo beta_hat
+    yyy      <- yy - phi0_hat
+    xxx      <- xx - phi_hat
+    www      <- pesos_DS(xxx)
+    beta_hat <- lmrob(yyy ~ xxx - 1, weights = www)$coeff
+
+    ## Calculo g_hat (Alvarez-Yohai)
+    g_hat <- mu_hat(yy - xx %*% beta_hat)
+
+    return(list(g = g_hat, b = beta_hat))
+}
+
+eta_hat <- function(zz, tt, ven) {
+    lz <- length(zz)
+    wt <- pesos(tt, ven)
+    medloc <- apply(wt, 1,
+                    function (x) {
+                        wtd.quantile(zz, weights = x, type = c('i/n'),
+                                     probs = c(0.5), normwt = TRUE)
+                    })
+    madloc <- sapply(1:lz,
+                     function (i) {
+                         wtd.quantile(abs(zz - medloc[i]),
+                                      weights = wt[i, ],
+                                      type = c('i/n'), probs = c(0.5),
+                                      normwt = TRUE)
+                     })
+    funObj <- function(aa, pesos_filai, zz, escala) {
+        sum(pesos_filai * Mchi((zz - aa) / escala, cc = 1.345, psi = 'Huber'))
+    }
+    eta <- sapply(1:lz, function(iter) {
+        optimize(funObj, c(-1e3, 1e3),
+                 pesos_filai = wt[iter, ],
+                 zz, escala  = madloc[iter])$minimum
+    })
+    return(eta)
+}
+
+mu_hat <- function (zz, cc = 1.345) {
+    ## Iniciales con LTS
+    m0      <- lmrob(zz ~ 1)
+    scl_ini <- m0$scale
+    ## Resuelvo el problema de monotonia
+    n       <- nrow(zz) 
+    orden   <- cbind(1:(n - 1), 2:n) # isotonicity (total order)
+    eps     <- scl_ini * cc / 2
+    activeSet(orden, hSolver, weights = 1, y = zz, eps = eps)$x 
+}
+
+## -----------------------------------------------------------------------------
+## Funciones auxiliares
+## -----------------------------------------------------------------------------
+
+## Donoho-Stahel
+pesos_DS <- function (x, percentil = 0.975) {
+    DSestim  <- CovSde(x)
+    media    <- DSestim@center
+    cova     <- DSestim@cov
+    norma2.x <- mahalanobis(x, media, cova)
+    w1       <- Mwgt(norma2.x, qchisq(percentil, ncol(x)), psi = 'bisquare')
+}
+
+pesos <- function (xt, ven) {
+    wt <- sapply(xt, function (s) {
+        tmp <- (s - xt) / ven
+        0.75 * (1 - tmp^2) * (abs(tmp) <= 1)
+    })
+    return(wt / colSums(wt))
+}
+
+scaleS <- function(u, b = 0.5 , cc = 1.54764) {
+    ## find the scale, full iterations
+    max.it <- 200
+    sc <- median(abs(u)) / 0.6745
+    i   <- 0
+    eps <- 1e-20
+    ## magic number alert
+    err <- 1
+    while(((i <- i + 1) < max.it) && (err > eps)) {
+        sc2 <- sqrt(sc^2 * mean(Mchi(u / sc, cc, psi = 'bisquare')) / b)
+        err <- abs(sc2 / sc - 1)
+        sc  <- sc2
+    }
+    return(sc)
+}
+
+## mu_hat <- function(zz,tt) {
+##     ## La funcion mu_hat asume que las observaciones se
+##     ## encuentran ordenadas de menor a mayor segun tt. 
+##     lz      <- length(zz)
+##     mu.temp <- matrix(NA, nrow=lz, ncol=lz)
+    
+##     ## calculo de escala sigma_n inicial y un mu inicial
+##     m0         <- ltsReg(zz ~ 1)
+##     beta_ini   <- coef(m0)
+##     escala_ini <- m0$scale
+    
+##     ## variables para simplificar las operaciones
+##     unos <- as.matrix(rep(1,lz))
+##     aa   <- 1:lz
+
+##     control <- lmrob.control(tuning.psi = 3.4434, psi = 'bisquare')
+##     for (ii in 1:lz) {
+##         for (j in ii:lz) {
+##             pesosuv <- 1*(aa>=ii)*(aa<=j)
+##             zzuv    <- zz [pesosuv>0]
+##             unosuv  <- as.matrix(unos[pesosuv>0])
+##             modelo  <- lmrob..M..fit(unosuv, zzuv,
+##                                      beta.initial = beta_ini, scale = escala_ini,
+##                                      control = control)
+##             mu.temp[ii, j] <- coef(modelo)
+##         }
+##     }
+    
+##     ## Ahora calculo mu en cada tt[i].
+##     mu     <- rep(NA,lz)
+##     mu[1]  <- max(min(mu.temp[1, 1:lz]))
+##     mu[lz] <- max(mu.temp[1:lz,lz])
+
+##     for(i in 2:(lz-1)) {
+##         aux    <- t(as.matrix(mu.temp[1:i, i:lz]))
+##         minenv <- apply(aux, 2, min)
+##         mu[i]  <- max(minenv)
+##     }
+##     return(mu)
+## }

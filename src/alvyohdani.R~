@@ -1,0 +1,52 @@
+##
+## Alvarez-Yohai
+##
+
+musombrero <- function(zz, tt) {
+  lz <- length(zz)
+  mu.temp <- matrix(NA, nrow = lz, ncol = lz)
+  
+  ## Calculo de escala sigma_n inicial y un mu inicial
+  m0 <- ltsReg(zz ~ 1)
+  betaini <- coef(m0)
+  escalaini <- m0$scale
+  
+  ## Variables para simplificar las operaciones
+  unos <- as.matrix(rep(1, lz))
+  aa   <- seq(1, lz, by = 1)
+  
+  for (ii in 1:lz) {
+    for (j in ii:lz) {
+        pesosuv <- 1 * (aa >= ii) * (aa <= j)
+        zzuv <- zz [pesosuv > 0]
+        unosuv <- as.matrix (unos[pesosuv > 0])
+        modelo <- lmrob..M..fit(unosuv, zzuv, beta.initial = betaini, scale = escalaini,
+                                control = lmrob.control(tuning.psi  = 4.685,
+                                                        psi         = 'bisquare',
+                                                        rel.tol     = 1e-5,
+                                                        refine.tol  = 1e-5,
+                                                        k.max       = 2e3,
+                                                        maxit.scale = 2e3,
+                                                        max.it      = 2e3))
+        mu.temp[ii,j] <- coef(modelo) #$coefficient
+    }
+  }
+  
+  ## Ahora calculo mu en cada tt[i].
+  mu     <- rep(NA,lz)
+  aux    <- as.matrix(mu.temp[1,1:lz])
+  minenv <- apply(aux, 2, min)
+  mu[1]  <- max(minenv)
+  
+  aux    <- t(as.matrix(mu.temp[1:lz, lz]))
+  minenv <- apply(aux, 2, min)
+  mu[lz] <-max(minenv)
+    
+  lz1 <- lz-1
+  for(i in 2:lz1) {
+      aux    <- t(as.matrix(mu.temp[1:i, i:lz]))
+      minenv <- apply(aux, 2, min)
+      mu[i]  <-max(minenv)
+  }
+  return(mu)
+}

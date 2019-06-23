@@ -1,0 +1,235 @@
+## ----------------------------------
+## Funciones para procesar los datos
+##
+## [0] convergencias
+## [1] mejor
+## [2] comunes
+## [3] masvotados
+## [4] plotear
+## [5] resumir
+## [6] resumirAY
+## ----------------------------------
+
+## [0] CONVERGENCIAS
+convergencias <- function(folder) {
+    files <- list.files(folder, full.names = TRUE)
+    datos <- read.table(files)
+    iter  <- datos[, 1]
+    conv  <- datos[, 2]
+    return(iter[conv == 0])
+}
+
+## [1] MEJOR
+mejor <- function (folder, cuales, criterio) {
+    ## Por columna los archivos tienen:
+    ##  1,       2,      3,  4,  5,  6,     7,            8,   9, 10,  11, 12
+    ## it, init_cv, est_cv, nn, pp, spl, mise,  mise_podado  scl, val, lm, spl
+    ##
+        files <- list.files(folder, full.names = TRUE)
+    crits <- sapply(files, function(x) { 
+        datos <- read.table(x)
+        iter  <- match(cuales, datos[, 1])
+        datos <- datos[iter, ]
+        nn    <- unique(datos[, 4])
+        pp    <- datos[, 5]
+        spl   <- datos[, 6]
+        scl   <- datos[, 9]
+        val   <- datos[, 10]
+        switch(criterio,
+               hic1 = log(scl^2 * val) + spl * log(nn) / (2 * nn) + 2 * pp / nn,
+               hic2 = log(scl^2) + val / nn + spl * log(nn) / (2 * nn) + 2 * pp / nn, 
+               bic  = log(scl^2 * val) + (spl + pp) * log(nn) / (2 * nn),
+               aic  = log(scl^2 * val) +  2 * (spl + pp) / nn)
+    }, USE.NAMES = FALSE)
+    best <- apply(crits, 1, which.min)
+    mapply(function (n, x) {
+        fila <- unlist(read.table(files[x])[n, ])
+        aux <- strsplit(folder,'/')[[1]]
+        write(fila, paste(criterio, aux[length(aux)],
+                          sep = '-'), length(fila), TRUE)
+    }, cuales, best)
+}
+
+## [2] ITERACIONES COMUNES
+comunes <- function (folder, recursive, pattern = '') {
+    files   <- list.files(folder, pattern, full.names = TRUE, recursive = recursive)
+    idx_all <- lapply(files, function (x) {read.table(x)[, 1]})
+    idx_min <- Reduce(intersect, idx_all)
+    return(idx_min)
+}
+
+## [3] MAS VOTADOS
+masvotados <- function (file) {
+    cols  <- max(count.fields(file))
+    datos <- read.table(file, col.names = 1:cols, fill = T)
+    table(datos[, 6])
+}
+
+## [4] 
+plotear <- function (archivo) { 
+    datos <- read.table(archivo)
+    nn    <- 100
+    smad  <- datos[, 2] 
+    ss    <- datos[, 3] 
+    mise  <- datos[, 4]
+    gg    <- t(datos[, 4 + (1:nn)])
+    bb    <- datos[, -(1:(nn + 4))]
+    par(mfrow = c(1, 4))
+    boxplot(cbind(smad, ss), names = c('MAD', 'M-scale'))
+    boxplot(mise, names = c('MISE'))
+    boxplot(bb, names = c('beta1', 'beta2'))
+    abline(h = c(0.5, 1), col = 'red')
+    grilla <- seq(0, 1, length = nn)
+    matplot(gg[, sample(ncol(datos), 100)], col = 'gray30', type = 'l')
+    lines(sin(grilla * pi / 2), col = 'blue', lwd = 3)
+    lines(rowMeans(gg), col = 'red', lwd = 3)
+}
+
+## [5] RESUME SEGUN EL CONJUNTO DE DATOS
+## ff: parte no parametrica
+## bb: betas verdaderos
+## rango: rango para los splines
+resumir <- function (archivo, ff, bb, rango, plt = FALSE) {
+    ## Por columna los archivos tienen:
+    ##  1,       2,      3,  4,  5,  6,     7,            8,   9, 10,  11, 12
+    ## it, init_cv, est_cv, nn, pp, spl, mise,  mise_podado  scl, val, lm, spl
+    ##
+    cols  <- max(count.fields(archivo))
+    datos <- read.table(archivo, col.names = 1:cols, fill = T)
+    datos[is.na(datos)] <- 0
+
+    ## The truth
+    nn  <- unique(datos[, 4])
+    pp  <- unique(datos[, 5])
+    ttt <- seq(0, 1, length = nn)
+    gg  <- ff(ttt)
+
+    ## Evaluated estimators for each replication
+    evaluar <- function (fila) {
+        set.seed(fila[1])
+        tt      <- runif(nn, rango[1], rango[2])
+        spl     <- fila[6]
+        params  <- fila[-(1:10)]
+        gg_par  <- params[pp + 1:spl]
+        bb_est  <- params[1:pp]
+        kns     <- seq(min(tt), max(tt), length = spl - 4 + 2)
+        basis   <- create.bspline.basis(rangeval = rango, breaks = kns, norder = 4)
+        bspl    <- getbasismatrix(ttt, basis)
+        gg_est  <- bspl %*% as.vector(gg_par)
+        return(c(bb_est, gg_est))
+    }
+    ests <- t(apply(datos, 1, evaluar))
+
+    ## Parametric term (beta)
+    betas <- ests[, 1:pp]
+    SD    <- apply(betas, 2, sd)
+    resta <- sweep(betas, 2, bb)
+    bias  <- colMeans(resta)
+    MSE   <- colMeans((resta)^2)
+
+    ## Non-parametric term (monotone function)
+    gg_est <- ests[, -(1:pp)]
+    paso   <- 1 / (length(ttt) - 1)
+    ISE    <- rowSums(sweep(gg_est, 2, gg)^2) * paso
+    MISE2  <- mean(ISE)
+    MISE1  <- mean(datos[, 8])
+        
+    ## Plots
+    if (plt==1) {
+        par(mfrow = c(1, 4))
+        matplot(ttt, t(gg_est), type = 'l', col = 1, lty = 2,
+                main = 'No param')
+        lines(ttt, gg, type = 'l', col = 'red', lwd = 3)
+        lines(ttt, colMeans(gg_est), col = 'blue', lwd = 3)
+        legend('topleft', legend = c('est','g','mean'),
+               lty = c(2, 1, 1), lwd = 3,
+               col = c('black','red','blue'))
+        ## Boxplot beta1
+        boxplot(betas[, 1], main = 'beta = 0.5')
+        abline(h = bb[1], col = 'red', lty = 2, lwd = 3)
+        ## Boxplot beta2
+        boxplot(betas[, 2], main = 'beta = 1')
+        abline(h = bb[2], col = 'red', lty = 2, lwd = 3)
+        ## Boxplot MISE
+        b = boxplot(datos[,7], main = 'MISE')
+        print(b$o)
+    }
+    ## Plots
+    if (plt==2) {
+        grafiquitos(archivo,
+                    betas[, 1], bb[1],
+                    betas[, 2], bb[2],
+                    datos[, 8])
+    }
+    return(c(bias = bias, sd = SD, MSE = MSE,
+             MISE1 = MISE1, MISE2 = MISE2))
+}
+
+## [6] RESUME AY
+resumirAY <- function (archivo, ff, bb, rango, cuales, plt) {
+    ##    1   2   3     4      5      6...
+    ## iter, s1, s2, mise, misep, est$b, est$g
+    ##
+    datos <- read.table(archivo)[cuales, ]
+
+    ## The truth
+    pp <- length(bb)
+    tt <- seq(rango[1], rango[2], length = 100)
+    gg <- ff(tt)
+
+    ## Estimators
+    estims <- datos[, -(1:5)]
+    bb_est <- estims[, 1:pp]
+    gg_est <- estims[, -(1:pp)]
+
+    ## Summary
+    resta <- sweep(bb_est, 2, bb)
+    bias  <- colMeans(resta)
+    SD    <- apply(bb_est, 2, sd)
+    MSE   <- colMeans((resta)^2)
+    MISE  <- mean(datos[, 4])
+    MISEp <- mean(datos[, 5])
+    
+    ## Plots
+    if (plt==1) {
+        par(mfrow = c(1, 4))
+        matplot(tt, t(gg_est), type = 'l', col = 1, lty = 2, main = 'No param')
+        lines(tt, gg, type = 'l', col = 'red', lwd = 3)
+        lines(tt, colMeans(gg_est), col = 'blue', lwd = 3)
+        legend('topleft', legend = c('est','g','mean'), lty = c(2, 1, 1), lwd = 3,
+               col = c('black','red','blue'))
+        #
+        boxplot(bb_est[, 1], main = bb[1])
+        abline(h = bb[1], col = 'red', lty = 2, lwd = 3)
+        #
+        boxplot(bb_est[, 2], main = bb[2])
+        abline(h = bb[2], col = 'red', lty = 2, lwd = 3)
+        ## Boxplot MISE
+        b = boxplot(datos[,4], main = 'MISE')
+    }
+    ## Plots
+    if (plt==2) {
+        grafiquitos(archivo,
+                    bb_est[, 1], bb[1],
+                    bb_est[, 2], bb[2],
+                    datos[, 5])
+    }
+    return(c(bias = bias, sd = SD, MSE = MSE, MISE = MISE, MISEp = MISEp))
+}
+
+grafiquitos <- function(archivo, b1est, b1, b2est, b2, mise){
+    pdf(paste(archivo, '-box1', '.pdf', sep=''))
+    boxplot(b1est, main = b1)
+    abline(h = b1, col = 'red', lty = 2, lwd = 3)
+    dev.off()
+    ##
+    pdf(paste(archivo, '-box2', '.pdf', sep=''))
+    boxplot(b2est, main = b2)
+    abline(h = b2, col = 'red', lty = 2, lwd = 3)
+    dev.off()
+    ## Boxplot MISE
+    pdf(paste(archivo, 'dens', '.pdf', sep=''))
+    b = plot(density(mise), main = 'MISE')
+    dev.off()
+    
+}
