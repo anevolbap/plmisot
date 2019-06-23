@@ -41,26 +41,3 @@ for (cont in contaminaciones) {
             to = replicaciones,
             carpeta = experimento)
 }
-
-
-source("src/simular.R")
-
-start <- Sys.time()
-ventanas <- 0.15
-contaminaciones <- "C215"
-experimento <- "salidas-revision-1000rep-24jun19"
-replicaciones <- 500
-
-for (cont in contaminaciones) {
-    simular(datos = "revision",
-            nn = 100,
-            estimate = list(type = "nos", ven = ventanas),
-            cont = cont,
-            poda = 0,
-            from = 1,
-            to = replicaciones,
-            carpeta = experimento)
-}
-
-end <- Sys.time()
-print(paste("Elapsed time:", end-start))
