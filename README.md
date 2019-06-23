@@ -2,11 +2,11 @@
 
 ### Argumentos (según estimate$type):
 * splines:
- * initial: "cl", "rb", "ay"
- * fLoss: "tukey", "huber", "l1", "ls"
- * spl: list or vector
+  * initial: "cl", "rb", "ay"
+  * fLoss: "tukey", "huber", "l1", "ls"
+  * spl: list or vector
 * nos:
- * ven: list or vector
+  * ven: list or vector
 
 ### Ejemplos:
   * Nosotros (estimate$type = "nos")
