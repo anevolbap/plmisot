@@ -88,7 +88,7 @@ simular_LuDu <- function (datos, nn, spl, cont, extra = NULL, initial,
             
             ## lmrob control parameters
             control <- lmrob.control(trace.level = 0,
-                                     tunning.psi = 3.4434,
+                                     tuning.psi  = 3.4434,
                                      nResample   = 5000,
                                      subsampling = 'simple',
                                      rel.tol     = 1e-5,
