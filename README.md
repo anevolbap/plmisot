@@ -1,7 +1,12 @@
 # PLMIsot
-* Argumentos
-  * initial: "cl", "rb", "ay"
-  * fLoss: "tukey", "huber", "l1", "ls"
+* Argumentos (según estimate$type):
+  * splines:
+   * initial: "cl", "rb", "ay"
+   * fLoss: "tukey", "huber", "l1", "ls"
+   * spl: list or vector
+  * nos:
+   * ven: list or vector
+
 * Ejemplos:
   * Nosotros
 ```R
