@@ -1,0 +1,20 @@
+# Emacs / editor backups
+*~
+\#*\#
+.\#*
+
+# R session
+.Rhistory
+.Rapp.history
+.RData
+.Ruserdata
+.Rproj.user/
+
+# Simulation outputs (created by corridas.R / simular.R)
+salidas-*/
+toy-example*/
+graficos-paper/
+
+# OS junk
+.DS_Store
+Thumbs.db
