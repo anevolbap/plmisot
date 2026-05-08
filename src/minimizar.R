@@ -78,17 +78,3 @@ optimizar <- function(init, funObj, k) {
                   control.outer = list(trace = F, eps = 1e-10))
     return(ret)
 }
-
-## ## Gradient
-## if (rbst) {
-##     gradfun <- function(params) {
-##         res <- yy - cbind(bsplc, xx) %*% params
-##         aux <- Mchi(res / scl_init, cc = rbst, psi = 'bisquare', deriv = 1)
-##         colSums(diag(as.vector(aux)) %*% xx)
-##     }
-## } else {
-##     gradfun <- function(params) {
-##         res <- yy - cbind(bsplc, xx) %*% params
-##         colSums(diag(as.vector(2 * res / scl_init, rbst)) %*% xx)
-##     }
-## }

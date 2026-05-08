@@ -3,7 +3,7 @@ library(fda)
 library(robustbase)
 source('src/generar.R')
 source('src/minimizar.R')
-source('src/mpl.v7.R')  ## source('src/mpl-pablo.R')
+source('src/mpl.R')
 
 
 simular <- function (datos, nn, estimate, cont, extra = NULL, poda,
