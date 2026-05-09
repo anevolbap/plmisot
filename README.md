@@ -1,24 +1,30 @@
 # plmisot
 
-Simulation code for the paper:
+[English](README.md) · [Español](README.es.md)
 
-> Rodriguez, D., Valdora, M., and Vena, P. (2019).
+R code for the simulation study in:
+
+> Rodríguez, D., Valdora, M., and Vena, P. (2022).
 > *Robust estimation in partially linear regression models with monotonicity constraints.*
 > Communications in Statistics - Simulation and Computation.
 > DOI: [10.1080/03610918.2019.1691732](https://doi.org/10.1080/03610918.2019.1691732)
 
-The model is
+This is the working implementation the authors used to produce the simulation results in the paper. It is **not** the supplementary material formally submitted to the journal.
+
+## Model
+
+The paper studies the partially linear model
 
 ```
 y = x' beta + g(t) + epsilon
 ```
 
-with `g` monotone. The repo implements two robust estimators and the simulation study from the paper.
+with `g` monotone, in the presence of outliers in the response and the carriers. The repo implements two robust estimators and the simulation study used to compare them.
 
 ## Estimators
 
-- **Alv-Yoh** (`type = "nos"`): the proposal of the paper. Combines a robust semiparametric step (Bianco-Boente style) with the monotone scale-equivariant estimator of Alvarez and Yohai (2012).
-- **Lu-Du** (`type = "splines"`): the spline-based competitor of Lu and Du, fit via constrained optimization with a choice of loss (`ls`, `huber`, `tukey`, `l1`).
+- **Alv-Yoh** (`type = "nos"`): the proposal of the paper. Combines a robust semiparametric step (Bianco-Boente style) with the monotone scale-equivariant estimator of Álvarez and Yohai (2012) for isotonic regression.
+- **Lu-Du** (`type = "splines"`): the spline-based competitor of Lu and Du, fit by constrained optimization with a choice of loss (`ls`, `huber`, `tukey`, `l1`).
 
 ## Repo layout
 
@@ -78,6 +84,10 @@ simular(datos = "revision",
 
 ## Reproducing the paper
 
-`corridas.R` runs the full study used in the paper (1000 replications per contamination scheme, four bandwidths). The same script also has a small toy example. Outputs go to a folder named by the `carpeta` argument; `procesamos.R` and `graficos-paper.R` consume those folders to produce tables and figures.
+`corridas.R` runs the full simulation study (1000 replications per contamination scheme, four bandwidths). The same script also has a smaller toy example. Outputs go to a folder named by the `carpeta` argument; `procesamos.R` and `graficos-paper.R` consume those folders to produce the tables and figures.
 
 Each replication seeds the RNG with its iteration index, so results are reproducible.
+
+## Citation
+
+If you use this code, please cite the paper.
