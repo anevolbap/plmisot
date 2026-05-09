@@ -23,8 +23,8 @@ con `g` monótona, en presencia de outliers en la respuesta y en las covariables
 
 ## Estimadores
 
-- **Alv-Yoh** (`type = "nos"`): la propuesta del paper. Combina un paso semiparamétrico robusto (al estilo Bianco-Boente) con el estimador monótono equivariante por escala de Álvarez y Yohai (2012) para regresión isotónica.
-- **Lu-Du** (`type = "splines"`): el competidor basado en splines de Lu y Du, ajustado por optimización con restricciones y elección de función de pérdida (`ls`, `huber`, `tukey`, `l1`).
+- **Alv-Yoh** (`type = "nos"`): la propuesta del paper. Combina un paso semiparamétrico robusto (al estilo Bianco-Boente) con el M-estimador monótono de Álvarez y Yohai (2012) para regresión isotónica.
+- **Lu-Du** (`type = "splines"`): el competidor basado en splines siguiendo a Lu (2010), ajustado por optimización con restricciones y elección de función de pérdida (`ls`, `huber`, `tukey`, `l1`).
 
 ## Estructura del repositorio
 
@@ -87,6 +87,12 @@ simular(datos = "revision",
 `corridas.R` corre el estudio completo del paper (1000 réplicas por esquema de contaminación, cuatro anchos de ventana). El mismo script tiene también un ejemplo chico. Las salidas van a una carpeta nombrada por el argumento `carpeta`; `procesamos.R` y `graficos-paper.R` consumen esas carpetas para producir las tablas y figuras.
 
 Cada réplica fija la semilla con su índice de iteración, así los resultados son reproducibles.
+
+## Referencias
+
+- Álvarez, E.E. y Yohai, V.J. (2012). *M-estimators for isotonic regression.* Journal of Statistical Planning and Inference, 142(8), 2351-2368. [doi:10.1016/j.jspi.2012.02.051](https://doi.org/10.1016/j.jspi.2012.02.051)
+- Lu, M. (2010). *Spline-based sieve maximum likelihood estimation in the partly linear model under monotonicity constraints.* Journal of Multivariate Analysis, 101(10), 2528-2542. [doi:10.1016/j.jmva.2010.07.002](https://doi.org/10.1016/j.jmva.2010.07.002)
+- Rodríguez, D., Valdora, M. y Vena, P. (2022). *Robust estimation in partially linear regression models with monotonicity constraints.* Communications in Statistics - Simulation and Computation. [doi:10.1080/03610918.2019.1691732](https://doi.org/10.1080/03610918.2019.1691732)
 
 ## Cita
 
